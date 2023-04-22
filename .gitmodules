@@ -1,0 +1,3 @@
+[submodule "striprtf/striprtf"]
+	path = striprtf/striprtf
+	url = https://github.com/joshy/striprtf.git
