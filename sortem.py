@@ -1,13 +1,13 @@
-# import logging as log
 import multiprocessing as mp
-from os import getcwd, listdir, mkdir, path, scandir
-from shutil import copyfile, move, rmtree
-from time import sleep
+from os import listdir, mkdir, path, scandir #, getcwd
+from shutil import move #, copyfile, rmtree
 
+from nltk import word_tokenize
+# from nltk.metrics.distance import jaccard_distance
+import nltkmodules
 from pathvalidate import sanitize_filename
-from rapidfuzz import fuzz
 
-from striprtf.striprtf.striprtf import rtf_to_text
+from striprtf.striprtf.striprtf.striprtf import rtf_to_text
 
 """
 NOTE: Going to have to process this job in a multi-pass. Do the initial binnning with this script, then take the largest
@@ -37,7 +37,16 @@ def yield_dirs(base_dir: str) -> str:
         if dir_item.is_dir():
             yield dir_item.path
 
-def compare_and_assign(source_path: str):
+def pseudo_jaccard_similarity(label1: set, label2: set) -> int:
+    """
+    NLTK's jaccard distance (correctly) returns % of all tokens that match. I need ratio of matching
+    tokens to size of shorter string.
+    """
+    return len(label1.intersection(label2)) / min(len(label1), len(label2))
+
+def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
+    base_name = path.basename(source_path)
+
     with open(source_path) as f:
         try:
             source_text = rtf_to_text(f.read(), errors="ignore")
@@ -46,60 +55,74 @@ def compare_and_assign(source_path: str):
             move(source_path, path.join(SORTING_DIR, "unreadable"))
             return
 
-    # Compare to largest file in each subdir of SORTING_DIR. Build a list of {metric, dir}.
-    results = []
+    # Compare to the largest file in each subdir of SORTING_DIR. Build a list of {metric, dir}.
+    source_tokens = set(word_tokenize(source_text))
+    calcs = []
     for dir_path in yield_dirs(SORTING_DIR):
         comp_path = biggest_file(dir_path)
 
         try:
             with open(comp_path) as c:
                 comp_text = rtf_to_text(c.read(), errors="ignore")
-                results.append({"metric": fuzz.partial_ratio(source_text, comp_text), "dir": dir_path})
-        except NameError:
-            #comp_path wasn't defined
+                comp_tokens = set(word_tokenize(comp_text))
+                # jaccard_dist = jaccard_distance(source_tokens, comp_tokens)
+                # similarity = (1 - jaccard_dist) * 100
+                similarity = 100 * pseudo_jaccard_similarity(source_tokens, comp_tokens)
+                calcs.append({"metric": similarity, "dir": dir_path})
+        except NameError:  # comp_path wasn't defined
             pass
     
-    results = [r for r in results if r["metric"] >= MATCH_RATIO_THRESHOLD]
-    results.sort(reverse=True, key=lambda _: _["metric"])
-    matched = True
-    if len(results):
-        # Place in same folder as file it matches best with.
-        best_match = results[0]
-        if best_match["metric"] >= MATCH_RATIO_THRESHOLD:
-            target_dir = best_match["dir"]
-        else:
-            matched = False
+    calcs.sort(reverse=True, key=lambda _: _["metric"])
+    if calcs[0]["metric"] >= MATCH_RATIO_THRESHOLD:
+        target_dir = calcs[0]["dir"]
+        print(f'  {base_name} best match: similarity {calcs[0]["metric"]:.2f} at {calcs[0]["dir"]}')
     else:
-        matched = False
-
-    if not matched:
-        # If no matches, make new folder and put it in there.
-        target_dir = path.join(SORTING_DIR, sanitize_filename(source_text[:25]))
+        target_dir = path.join(SORTING_DIR, sanitize_filename(source_text[:25]))  # Make a new folder
+        print(f'  {base_name} could not be matched. Best similarity: {calcs[0]["metric"]:.2f}')
     
-    try:
-        mkdir(target_dir)
-    except FileExistsError:
-        pass
+    if not dry_run:
+        try:
+            mkdir(target_dir)
+        except FileExistsError:
+            pass
 
     # When saving, rename it to the first 100 (sanitized) characters of its text + a unique index + ".rtf".
     new_fname = "".join([sanitize_filename(source_text[:100]), f' {len(listdir(target_dir))}', ".rtf"])
     new_file_path = path.join(target_dir, new_fname)
-    move(source_path, new_file_path)
-    print(f'Saved {new_file_path}')
+    
+    if not dry_run:
+        move(source_path, new_file_path)
+    
+    print(f'  Saved {base_name} as {new_file_path}')
+    return new_file_path
 
-def run_multi():
+def run_multi(n: int=-1):
     worker_count = mp.cpu_count() - 2
     print(f'Starting with {worker_count} workers')
     with mp.Pool(processes=worker_count) as pool:
-        while len(listdir(SOURCE_DIR)):
-            for batch in yield_file_batch(SOURCE_DIR, batch_size=worker_count):
-                print('Working on\n' + '\n'.join(batch))
-                pool.map(compare_and_assign, batch)
+        if n >= 0:
+            for _ in range(n):
+                for batch in yield_file_batch(SOURCE_DIR, batch_size=worker_count):
+                    print('Working on\n' + '\n'.join(batch))
+                    pool.map(compare_and_assign, batch)             
+        else:
+            while len(listdir(SOURCE_DIR)):
+                for batch in yield_file_batch(SOURCE_DIR, batch_size=worker_count):
+                    print('Working on\n' + '\n'.join(batch))
+                    pool.map(compare_and_assign, batch)
 
-def run_single():
-    for batch in yield_file_batch(SOURCE_DIR, batch_size=1):
-        print('Working on\n' + '\n'.join(batch))
-        compare_and_assign(batch[0])
+def run_single(n: int=-1, dry_run: bool=False):
+    if n >= 0:
+        for _ in range(n):
+            for batch in yield_file_batch(SOURCE_DIR, batch_size=1):
+                print('Working on\n' + '\n'.join(batch))
+                compare_and_assign(batch[0], dry_run)
+    else:
+        while len(listdir(SOURCE_DIR)):
+            for batch in yield_file_batch(SOURCE_DIR, batch_size=1):
+                print('Working on\n' + '\n'.join(batch))
+                compare_and_assign(batch[0], dry_run)
+        
 
 if __name__ == '__main__':  # Need this for mp to work!
     try:
@@ -107,11 +130,7 @@ if __name__ == '__main__':  # Need this for mp to work!
     except FileExistsError:
         pass
 
-    # log.basicConfig(filename='./log.txt', filemode='w', format='%(message)s', level=log.INFO)
-    # run_multi()
-
-    # while len(listdir(SOURCE_DIR)):  # Run until all source files are consumed
-    for i in range(2):  # Run N times, for debugging
-        run_single()
+    # run_multi(n=100)
+    run_single(n=10, dry_run=False)
     
     print('***** All Done! *****')
