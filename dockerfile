@@ -8,7 +8,7 @@ WORKDIR /app
 
 # pull the project from github
 RUN apt-get update && apt-get install -y git
-RUN git clone --verbose --branch docker https://github.com/davidstaab/journal_recovery.git .
+RUN git clone --verbose --branch docker --recurse-submodules https://github.com/davidstaab/journal_recovery.git .
 
 # install required python modules
 RUN python3 -m pip install --upgrade pip
