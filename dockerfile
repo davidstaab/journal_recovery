@@ -6,9 +6,10 @@ WORKDIR /app
 
 # pull the project from github
 RUN apt-get update && apt-get install -y git
-RUN git clone https://github.com/davidstaab/journal_recovery.git
+RUN git clone --verbose https://github.com/davidstaab/journal_recovery.git --branch docker
 
 # install required python modules
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --upgrade pip
+RUN pip3 install --no-cache-dir -r ./requirements.txt
 
 CMD [ "python", "sortem.py" ]
