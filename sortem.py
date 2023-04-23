@@ -1,5 +1,6 @@
 import multiprocessing as mp
 from os import listdir, mkdir, path, scandir #, getcwd
+from pathlib import Path
 from shutil import move #, copyfile, rmtree
 
 from nltk import word_tokenize
@@ -14,8 +15,8 @@ NOTE: Going to have to process this job in a multi-pass. Do the initial binnning
  in each folder and put them all together to do it again with a higher MATCH_RATIO_THRESHOLD to accommodate mistakes.
 """
 
-SOURCE_DIR = "./.files"
-SORTING_DIR = "./.sorted"
+SOURCE_DIR = Path('.source_dir').read_text().strip()
+SORTING_DIR = Path('.sorting_dir').read_text().strip()
 UNREADABLE_DIR = path.join(SORTING_DIR, "unreadable")
 UNSAVEABLE_DIR = path.join(SORTING_DIR, "unsaveable")
 MATCH_RATIO_THRESHOLD = 70
