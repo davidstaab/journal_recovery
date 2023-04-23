@@ -1,5 +1,7 @@
 # using Google's official Python image for Google Cloud Platform
-FROM gcr.io/google-appengine/python
+# FROM gcr.io/google-appengine/python
+
+FROM python:3.10
 
 # app directory within the container
 WORKDIR /app
