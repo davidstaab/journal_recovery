@@ -1,10 +1,7 @@
 services:
   sortem:
-    environment:
-      - SOURCE_DIR=../files
-      - SORTING_DIR../sorted
     build: .
     volumes:
-      - ${SOURCE_DIR}:/source
-      - ${SORTING_DIR}:/sorted
+      - ../files:/source
+      - ../sorted:/sorted
     command: python sortem.py
