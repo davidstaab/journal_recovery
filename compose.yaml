@@ -5,5 +5,5 @@ services:
       - ../files:/source
       - ../sorted:/sorted
     environment:
-      - PYTHONBUFFERED=1
+      - PYTHONUNBUFFERED=1
     command: python3 sortem.py
