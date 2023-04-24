@@ -1,7 +1,20 @@
 # journal_recovery
-A python script to recover my personal journal from 80k file fragments
+A python script to recover my personal journal from 80k file fragments scraped off a backup drive
 
-## The story
+## How to run it
+`git clone` the repo, then: `docker-compose build --no-cache --progress=plain`
+
+and then: `docker-compose up`
+
+### Environment config
+
+It's going to look for files to sort (and where to put them) in the path specified by two bits of code:
+* In compose.yaml, the host mount points under `volumes:`
+* In sortem.py, the defines `SOURCE_DIR` and `SORTING_DIR` after the include statements
+
+If you change a path, change it in both places.
+
+## The story of this project
 TODO
 
 Problem:
@@ -22,14 +35,4 @@ Solution:
     1. Ask ChatGPT again: run it in the cloud
 1. Build it into a Docker container
     1. Ask ChatGPT for help again
-1. Find a free cloud provider...
-
-## How to run it
-
-clone the repo, then:
-
-docker-compose build --no-cache --progress=plain
-
-and then:
-
-docker-compose up
+1. (Next step) Find a free cloud provider...
