@@ -1,6 +1,8 @@
 import multiprocessing as mp
 from os import listdir, mkdir, path, scandir
+from pathlib import Path
 from shutil import move
+from time import sleep
 
 from nltk import word_tokenize
 from pathvalidate import sanitize_filename
@@ -12,19 +14,12 @@ NOTE: Going to have to process this job in a multi-pass. Do the initial binnning
  in each folder and put them all together to do it again with a higher MATCH_RATIO_THRESHOLD to accommodate mistakes.
 """
 
-SOURCE_DIR = "../files"
-SORTING_DIR = "../sorted"
+APP_DIR = Path(__file__).parent.resolve()
+SOURCE_DIR = path.join(APP_DIR, "../files")
+SORTING_DIR = path.join(APP_DIR, "../sorted")
 UNREADABLE_DIR = path.join(SORTING_DIR, "unreadable")
 UNSAVEABLE_DIR = path.join(SORTING_DIR, "unsaveable")
 MATCH_RATIO_THRESHOLD = 70
-
-for d in [SORTING_DIR, UNREADABLE_DIR, UNSAVEABLE_DIR]:
-    try:
-        mkdir(d)
-    except FileExistsError:
-        if not path.isdir(d):
-            move(d, d + '.bak')
-            mkdir(d)
 
 def yield_file_batch(base_dir: str, batch_size: int) -> list:
     batch = []
@@ -148,12 +143,21 @@ def run_single(n: int=-1, dry_run: bool=False):
         
 
 if __name__ == '__main__':  # Need this for mp to work!
-    try:
-        mkdir(SORTING_DIR)
-    except FileExistsError:
-        pass
 
-    # compare_and_assign('./.files/File Name Lost (5469).rtf')  # Do one specific file
-    # run_single(n=10, dry_run=False)
-    run_multi(n=1000)
-    print('***** All Done! *****')
+    for d in [SORTING_DIR, UNREADABLE_DIR, UNSAVEABLE_DIR]:
+        try:
+            mkdir(d)
+        except FileExistsError:
+            if not path.isdir(d):
+                move(d, d + '.bak')
+                mkdir(d)
+
+    while True:
+
+        # check for files in SOURCE_DIR
+        if not (path.isdir(SOURCE_DIR) and len(listdir(SOURCE_DIR))):
+            sleep(10)
+        else:
+            # compare_and_assign('./.files/File Name Lost (5469).rtf')  # Do one specific file
+            # run_single(n=-1, dry_run=False)
+            run_multi(n=-1)
