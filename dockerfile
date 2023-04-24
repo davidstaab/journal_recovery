@@ -1,7 +1,7 @@
 FROM python:3.10-slim
 
 # app directory within the container
-WORKDIR /app
+WORKDIR /home/app
 
 # pull the project from github
 RUN apt-get update && apt-get install -y git

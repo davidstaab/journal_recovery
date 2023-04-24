@@ -12,8 +12,8 @@ NOTE: Going to have to process this job in a multi-pass. Do the initial binnning
  in each folder and put them all together to do it again with a higher MATCH_RATIO_THRESHOLD to accommodate mistakes.
 """
 
-SOURCE_DIR = "/source"
-SORTING_DIR = "/sorted"
+SOURCE_DIR = "../files"
+SORTING_DIR = "../sorted"
 UNREADABLE_DIR = path.join(SORTING_DIR, "unreadable")
 UNSAVEABLE_DIR = path.join(SORTING_DIR, "unsaveable")
 MATCH_RATIO_THRESHOLD = 70
