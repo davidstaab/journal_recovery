@@ -1,7 +1,7 @@
 import multiprocessing as mp
-from os import listdir, mkdir, path, scandir
+from os import listdir, mkdir, path, remove, scandir
 from pathlib import Path
-from shutil import move
+from shutil import copy
 from time import sleep
 
 from nltk import download as nltk_download, word_tokenize
@@ -62,7 +62,8 @@ def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
             source_text = rtf_to_text(f.read(), errors="ignore")
         except Exception as e:
             print(f'  Moving {base_name} to "unreadable" folder because {e}')
-            move(source_path, path.join(UNREADABLE_DIR, base_name))
+            copy(source_path, path.join(UNREADABLE_DIR, base_name))
+            remove(source_path)
             return
 
     # Compare to the largest file in each subdir of SORTING_DIR. Build a list of {metric, dir}.
@@ -81,7 +82,8 @@ def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
             pass
         except UnicodeDecodeError as e:  # somehow comp_path has invalid RTF encoding
             print(f'  Moving {comp_path} to "unreadable" folder because {e}')
-            move(comp_path, path.join(UNREADABLE_DIR, path.basename(comp_path)))
+            copy(comp_path, path.join(UNREADABLE_DIR, path.basename(comp_path)))
+            remove(comp_path)
     
     if len(calcs):
         calcs.sort(reverse=True, key=lambda _: _["metric"])
@@ -106,11 +108,13 @@ def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
         new_file_path = path.join(target_dir, new_fname)
 
         try:
-            move(source_path, new_file_path)
+            copy(source_path, new_file_path)
+            remove(source_path)
             print(f'  Saved {base_name} as {new_file_path}')
         except OSError as e:
             print(f'  Could not save {base_name} to {new_file_path} because {e}. Moving it to "unsaveable" folder.')
-            move(source_path, path.join(UNSAVEABLE_DIR, base_name))
+            copy(source_path, path.join(UNSAVEABLE_DIR, base_name))
+            remove(source_path)
     
     return new_file_path
 
@@ -152,7 +156,11 @@ if __name__ == '__main__':  # Need this for mp to work!
             mkdir(d)
         except FileExistsError:
             if not path.isdir(d):
-                move(d, d + '.bak')
+                # NB: copy/remove works across file systems per https://stackoverflow.com/a/42400063/2539684
+                #   whereas shutil.move() doesn't.
+                # Since this script runs in a docker container with mounted volumes, have to do copy/remove.
+                copy(d, d + '.bak')
+                remove(d)
                 mkdir(d)
 
     while True:
