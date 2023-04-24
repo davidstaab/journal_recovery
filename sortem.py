@@ -124,7 +124,7 @@ def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
     return new_file_path
 
 def run_multi(n: int=-1):
-    worker_count = mp.cpu_count() - 2
+    worker_count = mp.cpu_count() - 1  # Leave one behind to be polite to the OS
     print(f'Starting with {worker_count} workers')
     with mp.Pool(processes=worker_count) as pool:
         if n >= 0:
