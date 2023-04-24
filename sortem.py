@@ -4,7 +4,7 @@ from pathlib import Path
 from shutil import move
 from time import sleep
 
-from nltk import word_tokenize
+from nltk import download as nltk_download, word_tokenize
 from pathvalidate import sanitize_filename
 
 from striprtf.striprtf.striprtf.striprtf import rtf_to_text
@@ -143,6 +143,8 @@ def run_single(n: int=-1, dry_run: bool=False):
         
 
 if __name__ == '__main__':  # Need this for mp to work!
+
+    nltk_download('punkt')
 
     print(f'Application directory: {APP_DIR}')
     for d in [SORTING_DIR, UNREADABLE_DIR, UNSAVEABLE_DIR]:
