@@ -158,6 +158,6 @@ if __name__ == '__main__':  # Need this for mp to work!
         pass
 
     # compare_and_assign('./.files/File Name Lost (5469).rtf')  # Do one specific file
-    # run_single(n=-1, dry_run=False)
-    run_multi(n=1000)
+    run_single(n=10, dry_run=False)
+    # run_multi(n=1000)
     print('***** All Done! *****')

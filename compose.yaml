@@ -4,4 +4,6 @@ services:
     volumes:
       - ../files:/source
       - ../sorted:/sorted
-    command: python sortem.py
+    environment:
+      - PYTHONBUFFERED=1
+    command: python3 sortem.py
