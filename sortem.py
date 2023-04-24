@@ -1,10 +1,8 @@
 import multiprocessing as mp
-from os import listdir, mkdir, path, scandir #, getcwd
-from shutil import move #, copyfile, rmtree
+from os import listdir, mkdir, path, scandir
+from shutil import move
 
 from nltk import word_tokenize
-# from nltk.metrics.distance import jaccard_distance
-import nltkmodules
 from pathvalidate import sanitize_filename
 
 from striprtf.striprtf.striprtf.striprtf import rtf_to_text
@@ -82,8 +80,6 @@ def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
             with open(comp_path) as c:
                 comp_text = rtf_to_text(c.read(), errors="ignore")
                 comp_tokens = set(word_tokenize(comp_text))
-                # jaccard_dist = jaccard_distance(source_tokens, comp_tokens)
-                # similarity = (1 - jaccard_dist) * 100
                 similarity = 100 * pseudo_jaccard_similarity(source_tokens, comp_tokens)
                 calcs.append({"metric": similarity, "dir": dir_path})
         except (NameError, FileNotFoundError):  # comp_path wasn't defined
