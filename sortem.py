@@ -144,6 +144,7 @@ def run_single(n: int=-1, dry_run: bool=False):
 
 if __name__ == '__main__':  # Need this for mp to work!
 
+    print(f'Application directory: {APP_DIR}')
     for d in [SORTING_DIR, UNREADABLE_DIR, UNSAVEABLE_DIR]:
         try:
             mkdir(d)
