@@ -24,7 +24,7 @@ for d in [SORTING_DIR, UNREADABLE_DIR, UNSAVEABLE_DIR]:
     try:
         mkdir(d)
     except FileExistsError:
-        if path.isfile(d):
+        if not path.isdir(d):
             move(d, d + '.bak')
             mkdir(d)
 
