@@ -2,7 +2,7 @@
 A python script to recover my personal journal from 80k file fragments scraped off a backup drive
 
 ## How to run it
-`git clone` the repo, then: `docker-compose build --no-cache --progress=plain`
+`git clone --recurse-submodules` the repo, then: `docker-compose build --no-cache --progress=plain`
 
 and then: `docker-compose up`
 
