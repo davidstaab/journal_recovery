@@ -15,8 +15,8 @@ NOTE: Going to have to process this job in a multi-pass. Do the initial binnning
 """
 
 APP_DIR = Path(__file__).parent.resolve()
-SOURCE_DIR = path.join(APP_DIR, "../files")
-SORTING_DIR = path.join(APP_DIR, "../sorted")
+SOURCE_DIR = path.join(APP_DIR.parent, "files")
+SORTING_DIR = path.join(APP_DIR.parent, "sorted")
 UNREADABLE_DIR = path.join(SORTING_DIR, "unreadable")
 UNSAVEABLE_DIR = path.join(SORTING_DIR, "unsaveable")
 MATCH_RATIO_THRESHOLD = 70
