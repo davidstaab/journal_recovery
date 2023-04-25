@@ -147,7 +147,7 @@ def run_single(n: int=-1, dry_run: bool=False):
         
 
 if __name__ == '__main__':  # Need this for mp to work!
-    print('----------------------'))
+    print('----------------------')
     download('punkt')  # Needed by nltk
     print(f'Application directory: {APP_DIR}\n' + \
           f'Looking for files in {SOURCE_DIR}\n' + \
