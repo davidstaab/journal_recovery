@@ -11,4 +11,4 @@ RUN git clone --verbose --branch gcloud --recurse-submodules https://github.com/
 RUN python3 -m pip install --upgrade pip
 RUN pip3 install --no-cache-dir -r ./requirements.txt
 
-CMD [ "python", "sortem.py" ]
+CMD [ "python", "./sortem/sortem.py" ]
