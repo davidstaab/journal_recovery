@@ -14,7 +14,7 @@ NOTE: Going to have to process this job in a multi-pass. Do the initial binnning
  in each folder and put them all together to do it again with a higher MATCH_RATIO_THRESHOLD to accommodate mistakes.
 """
 
-APP_DIR = Path(__file__).parent.resolve()
+APP_DIR = Path(__file__).parent.parent.resolve()
 SOURCE_DIR = path.join(APP_DIR.parent, "files")
 SORTING_DIR = path.join(APP_DIR.parent, "sorted")
 UNREADABLE_DIR = path.join(SORTING_DIR, "unreadable")
