@@ -1,5 +1,5 @@
 .DS_Store
-.vscode
+**/.vscode
 log*
 profile*
-__pycache__
+**/__pycache__
