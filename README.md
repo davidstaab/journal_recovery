@@ -17,19 +17,21 @@ If you change a path, change it in both places.
 ## More ops stuff for my own reference
 ### Run the container locally
 `cd app && docker compose build --no-cache`
+
 `docker compose up`
 
 ### Run on GCE VM
 Note: vm target platform: `linux/amd64/v4`
 
 #### 1. Build and push the container image (dev machine shell)
-```
+```bash
 docker build --no-cache --platform linux/amd64 -t gcr.io/reliable-return-384618/sortem-image . \
 && docker push gcr.io/reliable-return-384618/sortem-image
 ```
 
 #### 2. Bounce the VM (local shell)
 `gcloud compute instances stop sortem-worker`
+
 `gcloud compute instances start sortem-worker`
 
 ### Utilities
@@ -44,6 +46,7 @@ docker build --no-cache --platform linux/amd64 -t gcr.io/reliable-return-384618/
 
 #### Check on VM progress
 Logs: `docker ps -q | xargs -L 1 docker logs -n 20`
+
 Remaining file count: `ls -1q ./source | wc -l`
 
 ## The story of this project
