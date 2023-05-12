@@ -21,6 +21,7 @@ UNREADABLE_DIR = path.join(SORTING_DIR, "unreadable")
 UNSAVEABLE_DIR = path.join(SORTING_DIR, "unsaveable")
 MATCH_RATIO_THRESHOLD = 70
 
+
 def yield_file_batch(base_dir: str, batch_size: int) -> list:
     batch = []
     for i in listdir(base_dir):
@@ -31,15 +32,18 @@ def yield_file_batch(base_dir: str, batch_size: int) -> list:
             break
     yield batch
 
+
 def biggest_file(base_dir: str) -> str:
     files = [{"size": path.getsize(path.join(base_dir, i)), "file": path.join(base_dir, i)} for i in listdir(base_dir)]
     return sorted(files, key=lambda _: _["size"], reverse=True)[0]["file"] if len(files) else ''
+
 
 def yield_dirs(base_dir: str) -> str:
     for dir_item in scandir(base_dir):
         if dir_item.is_dir():
             if dir_item.path not in [UNREADABLE_DIR, UNSAVEABLE_DIR]:
                 yield dir_item.path
+
 
 def pseudo_jaccard_similarity(label1: set, label2: set) -> int:
     """
@@ -51,8 +55,10 @@ def pseudo_jaccard_similarity(label1: set, label2: set) -> int:
     else:
         return 0
 
+
 def make_new_folder(name: str) -> str:
     return path.join(SORTING_DIR, sanitize_filename(name))
+
 
 def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
     base_name = path.basename(source_path)
@@ -74,9 +80,16 @@ def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
 
         try:
             with open(comp_path) as c:
-                comp_text = rtf_to_text(c.read(), errors="ignore")
+                # Read 500 characters for a sanity check. If it passes, read the whole thing.
+                comp_text = rtf_to_text(c.read(500), errors="ignore")
                 comp_tokens = set(word_tokenize(comp_text))
                 similarity = 100 * pseudo_jaccard_similarity(source_tokens, comp_tokens)
+                
+                if similarity >= MATCH_RATIO_THRESHOLD:
+                    comp_text = rtf_to_text(c.read(), errors="ignore")
+                    comp_tokens = set(word_tokenize(comp_text))
+                    similarity = 100 * pseudo_jaccard_similarity(source_tokens, comp_tokens)
+                
                 calcs.append({"metric": similarity, "dir": dir_path})
         except (NameError, FileNotFoundError):  # comp_path wasn't defined
             pass
@@ -118,6 +131,7 @@ def compare_and_assign(source_path: str, dry_run: bool=False) -> str:
     
     return new_file_path
 
+
 def run_multi(n: int=-1):
     worker_count = mp.cpu_count() - 1  # Leave one behind to be polite to the OS
     print(f'Starting with {worker_count} workers')
@@ -132,6 +146,7 @@ def run_multi(n: int=-1):
                 for batch in yield_file_batch(SOURCE_DIR, batch_size=worker_count):
                     print('Working on\n' + '\n'.join(batch))
                     pool.map(compare_and_assign, batch)
+
 
 def run_single(n: int=-1, dry_run: bool=False):
     if n >= 0:
