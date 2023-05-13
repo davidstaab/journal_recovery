@@ -39,7 +39,7 @@ docker build --no-cache --platform linux/amd64 -t gcr.io/reliable-return-384618/
 `gcloud compute ssh --project=reliable-return-384618 --zone=us-west4-b sortem-worker`
 
 #### Make a huge batch of files
-`cd ../files && tar cvzf files.tar.gz * && mv files.tar.gz ~/Desktop`
+`cd ../files && tar czf files.tar.gz * && mv files.tar.gz ~/Desktop`
 
 #### Unzip them on the VM (after they’ve been copied using the remote shell window)
 `cd ~ && tar xvzf files.tar.gz -C ~/source && rm files.tar.gz`
