@@ -144,10 +144,14 @@ def compare_to_sorted(sorting_dir: Path, source_text: str) -> list[tuple[int, Pa
 def compare_to_file(tokens: set, dir_path: Path, file: Path) -> dict[float, Path]:
     with open(file) as f:
         # Read 500 characters for a sanity check. If it passes, read the whole thing.
-        comp_text = rtf_to_text(f.read(500), errors="ignore")
-        comp_tokens = set(nltk.word_tokenize(comp_text))
-        similarity = 100 * pseudo_jaccard_similarity(tokens, comp_tokens)
-                
+        try:
+            comp_text = rtf_to_text(f.read(500), errors="ignore")
+            comp_tokens = set(nltk.word_tokenize(comp_text))
+            similarity = 100 * pseudo_jaccard_similarity(tokens, comp_tokens)
+        except Exception:
+            # Chopping an RTF file at a fixed offset can cause parsing errors. If so, just read the whole thing.
+            similarity = 100 # To pass the next check
+        
         if similarity >= MATCH_RATIO_THRESHOLD:
             comp_text = rtf_to_text(f.read(), errors="ignore")
             comp_tokens = set(nltk.word_tokenize(comp_text))
