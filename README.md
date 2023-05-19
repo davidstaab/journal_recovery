@@ -17,12 +17,16 @@ If you change a path, change it in both places.
 ## The story of this project
 
 Problem:
-1. I was using a writer's app called Scrivener to keep a journal. The Scrivener file (which turns out just to be a ZIP of a directory tree) was being sync'd to Dropbox. I lost both the Dropbox copy and the local copy in a catastrophic event.
-1. Dropbox had been backed up to a local NAS device with a cronjob tool. Hooray! However, the NAS's disk was also wiped in the same event.
-1. I used a file recovery tool on the NAS RAID; it scraped 80,000 RTF files off the disk. All of them were named "File Name Lost (#####).rtf".
-1. How to sort these files into copies of the same so I could take the largest of each one as the canonical version?
+I was using a writer's app called [Scrivener](https://www.literatureandlatte.com/scrivener/) to keep a journal. The Scrivener file (which turns out just to be a ZIP of RTF files) was being sync'd to Dropbox for backup. Unfortunately, I lost both the Dropbox copy and the local copy in a catastrophic digital event.
 
-Solution:
+Because I spent many years paranoid of just such a loss, Dropbox had also been backed up to a local NAS device on a cronjob. Hooray! However, the NAS's disk was also wiped in the same event.
+
+I wasn't able to recover from the event until more than 30 days after the loss, so the file fell out of Dropbox's history. My laptop was gone too; all I had was this NAS box. I used a file recovery tool on the NAS's RAID; it scraped 80,000 RTF file fragments off the disk. All of them were named "File Name Lost (#####).rtf". I knew my journal files were among them in various stages of development.
+
+How was I going to pick out the best versions of each journal file...and to find my journal files among the lot? I decided to sort these files into copies of the same so I could take the largest of each one as the canonical version. Then I'd go through the (much shorter) list manually and retain the ones that had journal content.
+
+### My Solution
+First pass: **sortem.py**
 1. First I have to be able to read these files. How to decode RTF? I found a library: [striprtf](https://github.com/joshy/striprtf)
 1. Now how do I compare any two files to see if they're similar?
     1. [thefuzz](https://github.com/seatgeek/thefuzz)
@@ -36,6 +40,12 @@ Solution:
     1. I've never done that before, so I ask ChatGPT for help again. It writes me some Dockerfile and compose.yaml snippets, and I figure out what they mean.
 1. Find a free cloud provider...(lol)
     1. I get $300 in promo credits on GCE, and they have a container optimized OS. Let's go!
+
+Next: **pruneem.py**
+The whole project is too big to tarball and pull off the VM, so I'll try to work on the device with some scripting tools.
+1. Use shell tools to find the largest folders of nonsense and delete those up-front. This will save some runtime for pruning.
+1. Run pruneem.py to compare files within a sorting directory with a higher similarity threshold: 90% rather than the first pass's 70%. If a file isn't similar enough, put it in a pile to be re-sorted. For files that are self-similar, take the largest and delete the rest.
+
 ## Ops stuff for my own reference
 ### Run the container locally
 `cd app && docker compose build --no-cache`
@@ -71,4 +81,4 @@ docker build --no-cache --platform linux/amd64 -t gcr.io/reliable-return-384618/
 
 Logs: `docker ps -aq | xargs -L 1 docker logs -n 20`
 
-Remaining file count: `ls -1q ./source | wc -l`
+Remaining file count: `ls -1q ~/source | wc -l`
