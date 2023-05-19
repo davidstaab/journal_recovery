@@ -210,11 +210,18 @@ if __name__ == '__main__':  # Need this for mp to work!
 
     while True:
         try:
-            next(SOURCE_DIR.iterdir())
-        except (StopIteration, FileNotFoundError):
+            # Count files in SOURCE_DIR.
+            i = 0
+            for j, _ in enumerate(SOURCE_DIR.iterdir()):
+                i = j + 1
+            print(f'{i} files remaining in {SOURCE_DIR}')
+        except (FileNotFoundError):
+            pass
+        
+        if 0 == i:
             sleep(10)
-            break
+            continue
 
         # compare_and_assign('./.files/File Name Lost (5469).rtf')  # Do one specific file
         # run_single(n=-1, dry_run=False)
-        run_multi(n=-1)
+        run_multi(n=min(i, 20))
