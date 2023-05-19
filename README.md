@@ -14,7 +14,29 @@ It's going to look for files to sort (and where to put them) in the path specifi
 
 If you change a path, change it in both places.
 
-## More ops stuff for my own reference
+## The story of this project
+
+Problem:
+1. I was using a writer's app called Scrivener to keep a journal. The Scrivener file (which turns out just to be a ZIP of a directory tree) was being sync'd to Dropbox. I lost both the Dropbox copy and the local copy in a catastrophic event.
+1. Dropbox had been backed up to a local NAS device with a cronjob tool. Hooray! However, the NAS's disk was also wiped in the same event.
+1. I used a file recovery tool on the NAS RAID; it scraped 80,000 RTF files off the disk. All of them were named "File Name Lost (#####).rtf".
+1. How to sort these files into copies of the same so I could take the largest of each one as the canonical version?
+
+Solution:
+1. First I have to be able to read these files. How to decode RTF? I found a library: [striprtf](https://github.com/joshy/striprtf)
+1. Now how do I compare any two files to see if they're similar?
+    1. [thefuzz](https://github.com/seatgeek/thefuzz)
+    1. But someone wrote a faster one which is still being updated: [rapidfuzz](https://maxbachmann.github.io/RapidFuzz/Installation.html)
+1. Now it's working, but it's way, way too slow
+    1. Ask ChatGPT to analyze my code for performance issues: It suggests switching to [Jaccard similarity in NLTK](https://www.nltk.org/_modules/nltk/metrics/distance.html#jaccard_distance)
+    1. Jaccard doesn't work quite the way I want, so I modify it to a "pseudo-jaccard" that fits my situation. *(See `pseudo_jaccard_similarity()` in sortem.py.)*
+1. Much faster! Hooray! But it ties up my laptop while running.
+    1. Ask ChatGPT for help again. It say, "Run it in the cloud."
+1. So I build it into a Docker container for easy deployment.
+    1. I've never done that before, so I ask ChatGPT for help again. It writes me some Dockerfile and compose.yaml snippets, and I figure out what they mean.
+1. Find a free cloud provider...(lol)
+    1. I get $300 in promo credits on GCE, and they have a container optimized OS. Let's go!
+## Ops stuff for my own reference
 ### Run the container locally
 `cd app && docker compose build --no-cache`
 
@@ -45,29 +67,8 @@ docker build --no-cache --platform linux/amd64 -t gcr.io/reliable-return-384618/
 `cd ~ && tar xzf files.tar.gz -C ~/source && rm files.tar.gz`
 
 #### Check on VM progress
-Logs: `docker ps -q | xargs -L 1 docker logs -n 20`
+*(I could add a HEALTHCHECK directive to the dockerfile to aid this, but I don't really need to and good shell scripting is hard.)*
+
+Logs: `docker ps -aq | xargs -L 1 docker logs -n 20`
 
 Remaining file count: `ls -1q ./source | wc -l`
-
-## The story of this project
-(TODO)
-
-Problem:
-1. Backing up a Scrivener file with Dropbox, lost the DB copy and the local copy
-1. DB had been backed up to a local NAS box with a regular cloning tool
-1. File recovery on the NAS RAID scraped 80k RTF files
-1. How to sort the files into copies of the same?
-
-Solution:
-1. Decode RTF
-1. Find a comparison module
-    1. thefuzz
-    1. rapidfuzz
-1. Way, way too slow
-    1. Ask ChatGPT for help: jaccard similarity
-    1. pseudo-jaccard to meet my situation
-1. Faster! Hooray! But it ties up my laptop
-    1. Ask ChatGPT again: run it in the cloud
-1. Build it into a Docker container
-    1. Ask ChatGPT for help again
-1. (Next step) Find a free cloud provider...
