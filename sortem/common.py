@@ -1,20 +1,18 @@
 import typing as t
 from pathlib import Path
-from shutil import copy
 
 import nltk
-from pathvalidate import sanitize_filename
 from striprtf.striprtf.striprtf.striprtf import rtf_to_text
 
 
-class Constants():
+class Config():
     # Defaults
     APP_DIR = Path(__file__).parent.parent.resolve()
     SOURCE_DIR = APP_DIR.parent / "files"
     SORTING_DIR = APP_DIR.parent / "sorted"
     UNREADABLE_DIR = SORTING_DIR / "unreadable"
-    UNSAVEABLE_DIR = SORTING_DIR / "unsaveable"
     MATCH_RATIO_THRESHOLD = 70
+    RUN_QUIET = False
     
     @classmethod
     def set_app_dir(cls, path: Path) -> None:
@@ -22,22 +20,57 @@ class Constants():
         cls.SOURCE_DIR = cls.APP_DIR.parent / "files"
         cls.SORTING_DIR = cls.APP_DIR.parent / "sorted"
         cls.UNREADABLE_DIR = cls.SORTING_DIR / "unreadable"
-        cls.UNSAVEABLE_DIR = cls.SORTING_DIR / "unsaveable"
         
     @classmethod
     def set_match_ratio_threshold(cls, threshold: int) -> None:
         cls.MATCH_RATIO_THRESHOLD = threshold
+        
+    @classmethod
+    def set_run_quiet(cls, quiet: bool) -> None:
+        cls.RUN_QUIET = quiet
 
 
-def exists(var:any) -> bool:
-    try:
-        var
-    except NameError:
-        return False
-    else:
-        return True
+def filtprint(*args, **kwargs) -> None:
+    if not Config.RUN_QUIET:
+        print(*args, **kwargs)
   
+
+import re
+from pathlib import Path
+
+def get_short_name(path: Path, max_len: int) -> str:
+    """Shorten a file or directory name to max_len characters. Used for printouts."""
+
+    if max_len < 3:
+        raise ValueError("max_len must be at least 3")
+        
+    preserved_start_chars = 4
+    if preserved_start_chars >= max_len:
+        raise ValueError(f"preserved_start_chars ({preserved_start_chars}) must be less than max_len ({max_len})")
     
+    # Regex pattern to capture trailing substrings for file names
+    pattern = re.compile(r'((?:\s\d+)?\..+)?$')
+    
+    if path.is_file():
+        match = pattern.search(path.name)
+        captured = match.group(0) if match else ""
+        name_without_captured = path.name[:match.start()] if match else path.name
+        
+        # subtract 3 for "..." and length of captured
+        if len(name_without_captured) + len(captured) > max_len:
+            return name_without_captured[:preserved_start_chars] + "..." + name_without_captured[-(max_len - preserved_start_chars - len(captured) - 3)] + captured
+        else:
+            return path.name
+    else:
+        # For directory, only consider the stem
+        stem = path.stem
+        if len(stem) > max_len:
+            return stem[:preserved_start_chars] + "..." + stem[-(max_len - preserved_start_chars - 3):]
+        else:
+            return stem
+
+
+
 def yield_file_batch(dir: Path, count: int) -> t.Generator[list[Path], None, None]:
     batch = [f for f in dir.iterdir() if f.is_file()][:count]
     while batch:
@@ -61,69 +94,42 @@ def pseudo_jaccard_similarity(label1: set, label2: set) -> float:
     return 0
 
 
-def move_and_rename(source_path: Path, new_stem: str, target_dir: Path) -> Path:
-    target_dir.mkdir(exist_ok=True)
-    
-    # When saving, sanitize stem, add a unique index + ".rtf".
-    new_fname = "".join([sanitize_filename(new_stem), f' {len(list(target_dir.iterdir()))}', ".rtf"])
-    new_file_path = target_dir / new_fname
-
-    try:
-        copy(source_path, new_file_path)
-    except OSError as e:
-        
-        if not exists(Constants.UNSAVEABLE_DIR):
-            raise
-              
-        print(f'  Could not save {source_path.name} to {new_file_path} because {e}. Moving it to "unsaveable" folder.')
-        try:
-            new_file_path = Constants.UNSAVEABLE_DIR / source_path.name
-            copy(source_path, new_file_path)
-        except Exception:
-            print(f"  Couldn't do that either. Leaving {source_path.name} where it is.")
-            return source_path
-        
-    else:
-        print(f'  Saved {source_path.name} as {new_file_path}')
-        source_path.unlink()
-        return new_file_path
-
-
-def read_rtf(file: Path, handle_unreadable: bool) -> str:
+def read_rtf(file: Path, length: int = -1, ignore_unreadable: bool = False) -> str:
     with open(file) as f:
         try:
-            text = rtf_to_text(f.read(), errors="ignore")
-        except Exception as e:
+            # NB: 'errors' arg is the same as bytes.decode()
+            # See here for possible values: https://docs.python.org/3.10/library/codecs.html#error-handlers
+            text = rtf_to_text(f.read(length), errors="ignore")
+        except UnicodeDecodeError as e:
             
-            if not handle_unreadable:
+            if not ignore_unreadable:
                 raise
             
-            if not exists(Constants.UNREADABLE_DIR):
-                raise
-            
-            print(f'  Moving {file.name} to "unreadable" folder because {e}')
-            copy(file, Constants.UNREADABLE_DIR / file.name)
-            file.unlink()
-            text = ''
-        
-        return text
+            return ''
+    
+    return text
 
 
 def compare_to_rtf(tokens: set, file: Path) -> float:
-    with open(file) as f:
-        # Read 500 characters for a sanity check. If it passes, read the whole thing.
-        try:
-            comp_text = read_rtf(f.read(500), handle_unreadable=False)
-            comp_tokens = set(nltk.word_tokenize(comp_text))
-            similarity = 100 * pseudo_jaccard_similarity(tokens, comp_tokens)
-        except Exception:
-            # Chopping an RTF file at a fixed offset can cause parsing errors. If so, just read the whole thing.
-            similarity = 100 # To pass the next check
+    # Read 500 characters for a sanity check. If it passes, read the whole thing.
+    try:
+        comp_text = read_rtf(file, length=500, ignore_unreadable=True)
         
-        if similarity >= Constants.MATCH_RATIO_THRESHOLD:
-            f.seek(0)
-            comp_text = read_rtf(f.read(500), handle_unreadable=True)
+        if comp_text:
             comp_tokens = set(nltk.word_tokenize(comp_text))
             similarity = 100 * pseudo_jaccard_similarity(tokens, comp_tokens)
+        else:
+            # probably a false negative. All 500 chars could be RTF markup.
+            similarity = 0
+
+    except Exception:
+        # Chopping an RTF file at a fixed offset can cause parsing errors.
+        #   If so, just read the whole thing.
+        similarity = 0
+    
+    if similarity >= Config.MATCH_RATIO_THRESHOLD or similarity == 0:
+        comp_text = read_rtf(file)
+        comp_tokens = set(nltk.word_tokenize(comp_text))
+        similarity = 100 * pseudo_jaccard_similarity(tokens, comp_tokens)
                 
     return similarity
