@@ -63,15 +63,16 @@ def path_short_name(path: Path, max_len: int) -> str:
     # Capture trailing substrings like " 123.rtf" or ".rtf"
     pattern = re.compile(r'((?:\s\d{1,3})\.rtf)$')
     
-    if path.is_file():
+    if path.is_dir():
+        name = path.stem + '/'
+        tail = name[-tail_len:]
+        name_wo_tail = name[:-tail_len]
+    else:
         name = path.name
         match = pattern.search(name)
-        tail = match.group(0) if match else ''
-        name_wo_tail = name[:match.start()] if match else name
-    else:
-        name = path.stem
-        tail = ''
-        name_wo_tail = name
+        tail = match.group(0) if match else name[-tail_len:]
+        name_wo_tail = name[:match.start()] if match else name[:-tail_len]
+
         
     if len(name_wo_tail) + len(tail) > max_len:
         body_len = max_len - head_len - len(placeholder) - len(tail)
