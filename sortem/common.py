@@ -1,9 +1,12 @@
+import functools
+import inspect
 import re
 import typing as t
 from pathlib import Path
 
 import nltk
 from striprtf.striprtf.striprtf.striprtf import rtf_to_text
+from termcolor import cprint
 
 
 class Config():
@@ -12,7 +15,7 @@ class Config():
     SOURCE_DIR = APP_DIR.parent / "files"
     SORTING_DIR = APP_DIR.parent / "sorted"
     UNREADABLE_DIR = SORTING_DIR / "unreadable"
-    MATCH_RATIO_THRESHOLD = 70
+    MATCH_RATIO_THRESHOLD = 90
     RUN_QUIET = False
     FNAME_LEN = 40
     DNAME_LEN = 80
@@ -33,9 +36,18 @@ class Config():
         cls.RUN_QUIET = quiet
 
 
-def filtprint(*args, **kwargs) -> None:
-    if not Config.RUN_QUIET:
-        print(*args, **kwargs)
+def _conditional_print(func) -> callable:
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not Config.RUN_QUIET:
+            return func(*args, **kwargs)
+    wrapper.__signature__ = inspect.signature(func)
+    return wrapper
+
+
+@_conditional_print
+def cprintif(*args, **kwargs) -> None:
+    cprint(*args, **kwargs)
   
 
 def path_short_name(path: Path, max_len: int) -> str:
@@ -48,8 +60,8 @@ def path_short_name(path: Path, max_len: int) -> str:
     if max_len <= head_len + tail_len + len(placeholder):
         raise ValueError(f"max_len ({max_len}) must be > {head_len + tail_len + len(placeholder)}")
     
-    # Capture trailing substrings for file names
-    pattern = re.compile(r'((?:\s\d+)?\..+)?$')
+    # Capture trailing substrings like " 123.rtf" or ".rtf"
+    pattern = re.compile(r'((?:\s\d{1,3})\.rtf)$')
     
     if path.is_file():
         name = path.name

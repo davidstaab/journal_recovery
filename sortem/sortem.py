@@ -3,24 +3,27 @@ import typing as t
 from pathlib import Path
 from shutil import copy
 from time import sleep
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import nltk
 from common import Config as C
-from common import (compare_to_rtf, filtprint, path_short_name, largest_file,
+from common import (compare_to_rtf, cprintif, path_short_name, largest_file,
                     read_rtf, batch_iterdir)
 from pathvalidate import sanitize_filename
 
-SNAME_LEN = 25  # Length of shortened names, for console output
+
+def sname(path: Path) -> str:
+    """Return shortened name of path. Hard-coded to 30 characters."""
+    return path_short_name(path, 30)
 
 
 def compare_and_assign(source_file: Path, dry_run: bool=False) -> Path:
-    short_name = path_short_name(source_file, SNAME_LEN)
+    short_name = sname(source_file)
     
     try:
         source_text = read_rtf(source_file)
     except Exception as e:
-        filtprint(f'  Moving {short_name} to "unreadable" folder because {e}')
+        cprintif(f'  Moving {short_name} to "unreadable" folder because {e}', 'light_red')
         new_file_path = C.UNREADABLE_DIR / source_file.name
         copy(source_file, new_file_path)
         source_file.unlink()
@@ -30,17 +33,16 @@ def compare_and_assign(source_file: Path, dry_run: bool=False) -> Path:
     
     if not calcs:
         target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
-        filtprint(f'  No similarities were calculated for {short_name}.')
+        cprintif(f'  No similarities were calculated for {short_name}.', 'light_red')
     else:
         calcs.sort(reverse=True, key=lambda _: _["metric"])
     
         if calcs[0]["metric"] < C.MATCH_RATIO_THRESHOLD:
             target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
-            filtprint(f'  {short_name} could not be matched at {calcs[0]["metric"]:.2f}')
+            cprintif(f'  {short_name} could not be matched at {calcs[0]["metric"]:.2f}', 'light_yellow')
         else:
             target_dir = calcs[0]["dir"]
-            short_dname = path_short_name(target_dir, C.DNAME_LEN)
-            filtprint(f'  {short_name} best match: {calcs[0]["metric"]:.2f} in {short_dname}')
+            cprintif(f'  {short_name} best match: {calcs[0]["metric"]:.2f} in {sname(target_dir)}')
     
     if not dry_run:
         # Use first 100 characters of text as filename stem.
@@ -72,34 +74,64 @@ def move_to_sorted(source_path: Path, new_stem: str, target_dir: Path) -> Path:
     target_dir.mkdir(exist_ok=True)
     
     # When saving, sanitize stem, add a unique index + ".rtf".
-    new_fname: str = "".join([sanitize_filename(new_stem), f' {len(list(target_dir.iterdir()))}', ".rtf"])
+    new_fname: str = ''.join([sanitize_filename(new_stem), f' {len(list(target_dir.iterdir()))}', '.rtf'])
     new_file_path = target_dir / new_fname.strip()
     copy(source_path, new_file_path)
     source_path.unlink()
-    filtprint(f'  Saved {path_short_name(source_path, 40)} as {path_short_name(new_file_path, 40)}')
+    cprintif(f'  Saved {sname(source_path)} as {sname(new_file_path)}')
     return new_file_path
 
 
+def print_file_count_msg(now: datetime) -> None:
+    file_count = sum(1 for _ in C.SOURCE_DIR.iterdir() if _.is_file())
+    cprintif(now.strftime("%A, %H:%M") + f': {file_count} files remaining', 'light_yellow')
+
+
 def run_multi() -> None:
+    # TODO Remove this when I've fixed the problem with mp and Config
+    cprintif(f'WARNING: Using hard-coded match threshold {C.MATCH_RATIO_THRESHOLD}%', 'light_red')
+    
+    then = datetime.now()
+    print_file_count_msg(then)
+    
     worker_count = mp.cpu_count() - 1  # Leave one behind to be polite to the OS
-    filtprint(f'Using {worker_count} workers')
+    cprintif(f'Using {worker_count} workers', 'light_blue')
+    
     with mp.Pool(processes=worker_count) as pool:
         for batch in batch_iterdir(C.SOURCE_DIR, count=worker_count):
-            filtprint('Working on\n' + '\n  '.join([path_short_name(b, SNAME_LEN) for b in batch]))
+            now = datetime.now()
+            if now - then > timedelta(minutes=5):
+                print_file_count_msg(now)
+                then = now
+            
+            cprintif('Working on\n  ' + '\n  '.join([sname(b) for b in batch]), 'light_blue')
             pool.map(compare_and_assign, batch)             
 
 
 def run_single(dry_run: bool=False) -> None:
-    filtprint(f'Using 1 worker')
-    for batch in batch_iterdir(C.SOURCE_DIR, count=1):
-        filtprint(f'Working on {path_short_name(batch[0], SNAME_LEN)}')
-        compare_and_assign(batch[0], dry_run)
+    then = datetime.now()
+    print_file_count_msg(then)
+    
+    cprintif(f'Using 1 worker', 'light_blue')
+    
+    for file in C.SOURCE_DIR.iterdir():
+        now = datetime.now()
+        if now - then > timedelta(minutes=5):
+            print_file_count_msg(now)
+            then = now
+        
+        cprintif(f'Working on {sname(file)}', 'light_blue')
+        compare_and_assign(file, dry_run)
 
 
 if __name__ == '__main__':  # Need this for mp to work!
     
     C.set_app_dir(Path(__file__).parent.parent.resolve())
+    
+    # This only works in single processing.
+    # TODO Learn how to get subprocesses to inherit my Config settings.
     C.set_match_ratio_threshold(90)
+    
     C.set_run_quiet(False)
     nltk.download('punkt', quiet=True)  # Needed by nltk
     
@@ -107,12 +139,12 @@ if __name__ == '__main__':  # Need this for mp to work!
         '----------------------',
         f'Application directory: {C.APP_DIR}',
         f'Looking for files in {C.SOURCE_DIR}',
-        f'Sorting files into {C.SORTING_DIR}\n',
+        f'Sorting files into {C.SORTING_DIR}',
         f'Match threshold: {C.MATCH_RATIO_THRESHOLD}%',
         f'----------------------',
     ]
 
-    filtprint('\n'.join(opening_msgs))
+    cprintif('\n'.join(opening_msgs))
     for d in [C.SORTING_DIR, C.UNREADABLE_DIR]:
         try:
             d.mkdir()
@@ -130,11 +162,9 @@ if __name__ == '__main__':  # Need this for mp to work!
             file_count = sum(1 for _ in C.SOURCE_DIR.iterdir() if _.is_file())
         except FileNotFoundError:
             file_count = 0
-        
-        now = datetime.now().strftime("%A, %H:%M")
-        print(now + f': {file_count} files in {C.SOURCE_DIR}')
-        
+                
         if not file_count:
+            print_file_count_msg(datetime.now())
             sleep(60)
             continue
 

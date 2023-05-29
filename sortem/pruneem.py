@@ -3,9 +3,12 @@ from shutil import copy
 
 import nltk
 from common import Config as C
-from common import compare_to_rtf, largest_file, read_rtf, path_short_name, filtprint
+from common import compare_to_rtf, largest_file, read_rtf, path_short_name, cprintif
 
-SNAME_LEN = 25  # Length of shortened names, for console output
+
+def sname(path: Path) -> str:
+    """Return shortened name of path. Hard-coded to 30 characters."""
+    return path_short_name(path, 30)
 
 
 def check_dir_for_one_file(dir: Path) -> bool:
@@ -36,12 +39,12 @@ if __name__ == '__main__':
         f'----------------------',
     ]
     
-    filtprint('\n'.join(opening_msgs))
+    cprintif('\n'.join(opening_msgs))
     ignores = [C.UNREADABLE_DIR]
     for subdir in C.SORTING_DIR.iterdir():
     
         if subdir.is_dir() and subdir not in ignores:
-            filtprint(f'Working in /{path_short_name(subdir, SNAME_LEN)}')
+            cprintif(f'Working in /{sname(subdir)}', 'light_blue')
             largest = largest_file(subdir)
 
             for file in subdir.iterdir():
@@ -51,21 +54,22 @@ if __name__ == '__main__':
                     match = compare_to_rtf(source_tokens, largest)
                     
                     if  match >= C.MATCH_RATIO_THRESHOLD:
-                        filtprint(f'  Deleting {path_short_name(file, SNAME_LEN)} because it matched {match:.2f}%')
+                        cprintif(f'  Deleting {sname(file)} because it matched {match:.2f}%', 'light_yellow')
                         file.unlink()
                     else:
-                        filtprint(f'  {path_short_name(file, SNAME_LEN)} matched only {match:.2f}%. ' + \
+                        cprintif(f'  {sname(file)} matched only {match:.2f}%. ' + \
                             f'Moving it back to /{C.SOURCE_DIR.stem}')
                         copy(file, C.SOURCE_DIR / file.name)
                         file.unlink()
     
-    filtprint('----------------------')
-    filtprint('Deleting empty subdirs')                        
+    cprintif('----------------------')
+    cprintif('Deleting empty subdirs')                        
     for subdir in C.SORTING_DIR.iterdir():
         if subdir.is_dir() and subdir not in ignores:
             if not len([d for d in subdir.iterdir()]):  # If empty
-                filtprint(f'  Deleting /{path_short_name(subdir, SNAME_LEN)}')
+                cprintif(f'  Deleting /{sname(subdir)}', 'light_yellow')
                 subdir.rmdir()
                 
-    filtprint('----------------------')
-    filtprint('Sanity check: ' + ('OK' if sanity_check() else 'FAILED'))
+    ok = sanity_check()
+    cprintif('----------------------')
+    cprintif('Sanity check: ' + ('OK' if ok else 'FAILED'), 'light_green' if ok else 'light_red')
