@@ -44,6 +44,10 @@ First pass: **sortem.py**
 Next: **pruneem.py**
 I tarball'd the results of sortem and downloaded it to my laptop. Used shell tools to find the largest folders of nonsense and delete those up-front. (Mostly legal disclaimers from apps and code packages, copyright notices, etc.) This will save some runtime for pruning.
 1. Run pruneem compare files within a sorting directory with a higher similarity threshold: 90% rather than the first pass's 70%. If a file isn't similar enough, put it in a pile to be re-sorted. For files that are self-similar, take the largest and delete the rest.
+1. Go back and forth between sortem and pruneem. Get them to agree on which folder a file should live in (or whether it's just like another and should be deleted).
+
+Finally: **backandforth.py**
+When it's working properly with small test batches on my laptop, write a wrapper app that executes sortem and prunem alternatingly until concensus is achieved. Run this on the VM because it'll take a long time.
 
 ## Ops stuff for my own reference
 ### Run the container locally
