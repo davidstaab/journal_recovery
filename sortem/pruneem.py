@@ -16,12 +16,13 @@ def check_dir_for_one_file(dir: Path) -> bool:
     return len([f for f in dir.iterdir() if f.is_file()]) == 1
 
 
-def sanity_check() -> bool:
-    """Return True if sorting dir contains only subdirs with one file each."""
+def sanity_check() -> list[Path]:
+    """Return paths that don't have only one file in them."""
+    ret = []
     for subdir in C.SORTING_DIR.iterdir():
-        if subdir.is_dir() and not check_dir_for_one_file(subdir):
-            return False
-    return True
+        if subdir.is_dir() and not subdir == C.UNREADABLE_DIR and not check_dir_for_one_file(subdir):
+            ret.append(subdir)
+    return ret
 
 
 if __name__ == '__main__':
@@ -44,7 +45,8 @@ if __name__ == '__main__':
     for subdir in C.SORTING_DIR.iterdir():
     
         if subdir.is_dir() and subdir not in ignores:
-            cprintif(f'Working in /{sname(subdir)}', 'light_blue')
+            cprintif(f'Working in {sname(subdir)}', 'light_blue')
+            # Compare to the largest file on disk because sortem does.
             largest = largest_file(subdir)
 
             for file in subdir.iterdir():
@@ -54,11 +56,10 @@ if __name__ == '__main__':
                     match = compare_to_rtf(source_tokens, largest)
                     
                     if  match >= C.MATCH_RATIO_THRESHOLD:
-                        cprintif(f'  Deleting {sname(file)} because it matched {match:.2f}%', 'light_yellow')
+                        cprintif(f'  {sname(file)} match {match:.2f}% -> Deleted.', 'light_yellow')
                         file.unlink()
                     else:
-                        cprintif(f'  {sname(file)} matched only {match:.2f}%. ' + \
-                            f'Moving it back to /{C.SOURCE_DIR.stem}')
+                        cprintif(f'  {sname(file)} match {match:.2f}% -> Returned to /{C.SOURCE_DIR.stem}')
                         copy(file, C.SOURCE_DIR / file.name)
                         file.unlink()
     
@@ -66,10 +67,12 @@ if __name__ == '__main__':
     cprintif('Deleting empty subdirs')                        
     for subdir in C.SORTING_DIR.iterdir():
         if subdir.is_dir() and subdir not in ignores:
-            if not len([d for d in subdir.iterdir()]):  # If empty
+            if not len([i for i in subdir.iterdir()]):  # If empty
                 cprintif(f'  Deleting /{sname(subdir)}', 'light_yellow')
                 subdir.rmdir()
                 
-    ok = sanity_check()
-    cprintif('----------------------')
-    cprintif('Sanity check: ' + ('OK' if ok else 'FAILED'), 'light_green' if ok else 'light_red')
+    failed_dirs = sanity_check()
+    if len(failed_dirs):
+        cprintif('----------------------', 'light_red')
+        cprintif('Directories with more than one file remaining:\n', 'light_red')
+        cprintif('\n'.join([f'  {d.stem}' for d in failed_dirs]), 'light_red')

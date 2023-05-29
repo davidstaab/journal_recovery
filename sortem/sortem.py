@@ -18,12 +18,12 @@ def sname(path: Path) -> str:
 
 
 def compare_and_assign(source_file: Path, dry_run: bool=False) -> Path:
-    short_name = sname(source_file)
+    file_sname = sname(source_file)
     
     try:
         source_text = read_rtf(source_file)
     except Exception as e:
-        cprintif(f'  Moving {short_name} to "unreadable" folder because {e}', 'light_red')
+        cprintif(f'  {file_sname} -> {sname(C.UNREADABLE_DIR)} because {e}', 'light_red')
         new_file_path = C.UNREADABLE_DIR / source_file.name
         copy(source_file, new_file_path)
         source_file.unlink()
@@ -33,16 +33,16 @@ def compare_and_assign(source_file: Path, dry_run: bool=False) -> Path:
     
     if not calcs:
         target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
-        cprintif(f'  No similarities were calculated for {short_name}.', 'light_red')
+        cprintif(f'  {file_sname}: No similarities were calculated!', 'light_red')
     else:
         calcs.sort(reverse=True, key=lambda _: _["metric"])
     
         if calcs[0]["metric"] < C.MATCH_RATIO_THRESHOLD:
             target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
-            cprintif(f'  {short_name} could not be matched at {calcs[0]["metric"]:.2f}', 'light_yellow')
+            cprintif(f'  {file_sname} match {calcs[0]["metric"]:.2f}%', 'light_yellow')
         else:
             target_dir = calcs[0]["dir"]
-            cprintif(f'  {short_name} best match: {calcs[0]["metric"]:.2f} in {sname(target_dir)}')
+            cprintif(f'  {file_sname} match: {calcs[0]["metric"]:.2f}% in {sname(target_dir)}')
     
     if not dry_run:
         # Use first 100 characters of text as filename stem.
@@ -61,6 +61,9 @@ def compare_to_sorted(text: str, sorted_dir: Path) -> list[dict[float, Path]]:
     for subdir in sorted_dir.iterdir():
         
         if subdir.is_dir() and subdir not in ignores:
+            # NB: Certain content, like embedded images, lives in the RTF tags and not the
+            #   stripped text. So the largest file on disk could have the most content,
+            #   rather than the longest stripped text.
             comp_file = largest_file(subdir)
 
             if comp_file:
@@ -78,7 +81,7 @@ def move_to_sorted(source_path: Path, new_stem: str, target_dir: Path) -> Path:
     new_file_path = target_dir / new_fname.strip()
     copy(source_path, new_file_path)
     source_path.unlink()
-    cprintif(f'  Saved {sname(source_path)} as {sname(new_file_path)}')
+    cprintif(f'  {sname(source_path)} -> {sname(target_dir)}{sname(new_file_path)}')
     return new_file_path
 
 
@@ -95,7 +98,7 @@ def run_multi() -> None:
     print_file_count_msg(then)
     
     worker_count = mp.cpu_count() - 1  # Leave one behind to be polite to the OS
-    cprintif(f'Using {worker_count} workers', 'light_blue')
+    cprintif(f'Using {worker_count} workers', 'light_yellow')
     
     with mp.Pool(processes=worker_count) as pool:
         for batch in batch_iterdir(C.SOURCE_DIR, count=worker_count):
@@ -112,7 +115,7 @@ def run_single(dry_run: bool=False) -> None:
     then = datetime.now()
     print_file_count_msg(then)
     
-    cprintif(f'Using 1 worker', 'light_blue')
+    cprintif(f'Using 1 worker', 'light_yellow')
     
     for file in C.SOURCE_DIR.iterdir():
         now = datetime.now()
@@ -126,13 +129,12 @@ def run_single(dry_run: bool=False) -> None:
 
 if __name__ == '__main__':  # Need this for mp to work!
     
-    C.set_app_dir(Path(__file__).parent.parent.resolve())
-    
     # This only works in single processing.
     # TODO Learn how to get subprocesses to inherit my Config settings.
-    C.set_match_ratio_threshold(90)
-    
+    C.set_app_dir(Path(__file__).parent.parent.resolve())
+    C.set_match_ratio_threshold(90)    
     C.set_run_quiet(False)
+    
     nltk.download('punkt', quiet=True)  # Needed by nltk
     
     opening_msgs = [

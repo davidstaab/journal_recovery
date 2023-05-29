@@ -18,7 +18,9 @@ class Config():
     MATCH_RATIO_THRESHOLD = 90
     RUN_QUIET = False
     FNAME_LEN = 40
-    DNAME_LEN = 80
+    # More important that this be a high number than FNAME_LEN
+    #  to prevent sorting distinct files into the same directory.
+    DNAME_LEN = 100
     
     @classmethod
     def set_app_dir(cls, path: Path) -> None:
