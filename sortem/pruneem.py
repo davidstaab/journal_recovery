@@ -3,7 +3,23 @@ from shutil import copy
 
 import nltk
 from common import Config as C
-from common import compare_to_rtf, largest_file, read_rtf, get_short_name, filtprint
+from common import compare_to_rtf, largest_file, read_rtf, path_short_name, filtprint
+
+SNAME_LEN = 25  # Length of shortened names, for console output
+
+
+def check_dir_for_one_file(dir: Path) -> bool:
+    """Return True if dir contains only one file."""
+    return len([f for f in dir.iterdir() if f.is_file()]) == 1
+
+
+def sanity_check() -> bool:
+    """Return True if sorting dir contains only subdirs with one file each."""
+    for subdir in C.SORTING_DIR.iterdir():
+        if subdir.is_dir() and not check_dir_for_one_file(subdir):
+            return False
+    return True
+
 
 if __name__ == '__main__':
     
@@ -25,26 +41,31 @@ if __name__ == '__main__':
     for subdir in C.SORTING_DIR.iterdir():
     
         if subdir.is_dir() and subdir not in ignores:
-            filtprint(f'Working in /{get_short_name(subdir, 40)}')
+            filtprint(f'Working in /{path_short_name(subdir, SNAME_LEN)}')
             largest = largest_file(subdir)
-            source_tokens = set(nltk.word_tokenize(read_rtf(largest)))
 
             for file in subdir.iterdir():
                 
                 if file.is_file() and file != largest:
-                    match = compare_to_rtf(source_tokens, file)
+                    source_tokens = set(nltk.word_tokenize(read_rtf(file)))
+                    match = compare_to_rtf(source_tokens, largest)
                     
                     if  match >= C.MATCH_RATIO_THRESHOLD:
-                        filtprint(f'  Deleting {get_short_name(file, 25)} because it matched {match:.2f}%')
+                        filtprint(f'  Deleting {path_short_name(file, SNAME_LEN)} because it matched {match:.2f}%')
                         file.unlink()
                     else:
-                        filtprint(f'  {get_short_name(file, 25)} matched only {match:.2f}%.' + \
+                        filtprint(f'  {path_short_name(file, SNAME_LEN)} matched only {match:.2f}%. ' + \
                             f'Moving it back to /{C.SOURCE_DIR.stem}')
                         copy(file, C.SOURCE_DIR / file.name)
                         file.unlink()
-                        
+    
+    filtprint('----------------------')
+    filtprint('Deleting empty subdirs')                        
     for subdir in C.SORTING_DIR.iterdir():
         if subdir.is_dir() and subdir not in ignores:
             if not len([d for d in subdir.iterdir()]):  # If empty
-                filtprint(f'Deleting empty subdir /{get_short_name(subdir, 40)}')
+                filtprint(f'  Deleting /{path_short_name(subdir, SNAME_LEN)}')
                 subdir.rmdir()
+                
+    filtprint('----------------------')
+    filtprint('Sanity check: ' + ('OK' if sanity_check() else 'FAILED'))

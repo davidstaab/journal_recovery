@@ -1,3 +1,4 @@
+import re
 import typing as t
 from pathlib import Path
 
@@ -13,6 +14,8 @@ class Config():
     UNREADABLE_DIR = SORTING_DIR / "unreadable"
     MATCH_RATIO_THRESHOLD = 70
     RUN_QUIET = False
+    FNAME_LEN = 40
+    DNAME_LEN = 80
     
     @classmethod
     def set_app_dir(cls, path: Path) -> None:
@@ -26,7 +29,7 @@ class Config():
         cls.MATCH_RATIO_THRESHOLD = threshold
         
     @classmethod
-    def set_run_quiet(cls, quiet: bool) -> None:
+    def set_run_quiet(cls, quiet: bool = True) -> None:
         cls.RUN_QUIET = quiet
 
 
@@ -35,43 +38,37 @@ def filtprint(*args, **kwargs) -> None:
         print(*args, **kwargs)
   
 
-import re
-from pathlib import Path
-
-def get_short_name(path: Path, max_len: int) -> str:
-    """Shorten a file or directory name to max_len characters. Used for printouts."""
-
-    if max_len < 3:
-        raise ValueError("max_len must be at least 3")
+def path_short_name(path: Path, max_len: int) -> str:
+    """Shorten a file name or directory stem to max_len characters. Used for printouts."""
         
-    preserved_start_chars = 4
-    if preserved_start_chars >= max_len:
-        raise ValueError(f"preserved_start_chars ({preserved_start_chars}) must be less than max_len ({max_len})")
+    head_len = 4  # Arbitrary
+    tail_len = 7  # To accommodate " ###.ext"
+    placeholder = '...'
     
-    # Regex pattern to capture trailing substrings for file names
+    if max_len <= head_len + tail_len + len(placeholder):
+        raise ValueError(f"max_len ({max_len}) must be > {head_len + tail_len + len(placeholder)}")
+    
+    # Capture trailing substrings for file names
     pattern = re.compile(r'((?:\s\d+)?\..+)?$')
     
     if path.is_file():
-        match = pattern.search(path.name)
-        captured = match.group(0) if match else ""
-        name_without_captured = path.name[:match.start()] if match else path.name
-        
-        # subtract 3 for "..." and length of captured
-        if len(name_without_captured) + len(captured) > max_len:
-            return name_without_captured[:preserved_start_chars] + "..." + name_without_captured[-(max_len - preserved_start_chars - len(captured) - 3)] + captured
-        else:
-            return path.name
+        name = path.name
+        match = pattern.search(name)
+        tail = match.group(0) if match else ''
+        name_wo_tail = name[:match.start()] if match else name
     else:
-        # For directory, only consider the stem
-        stem = path.stem
-        if len(stem) > max_len:
-            return stem[:preserved_start_chars] + "..." + stem[-(max_len - preserved_start_chars - 3):]
-        else:
-            return stem
+        name = path.stem
+        tail = ''
+        name_wo_tail = name
+        
+    if len(name_wo_tail) + len(tail) > max_len:
+        body_len = max_len - head_len - len(placeholder) - len(tail)
+        return name_wo_tail[:head_len + body_len] + placeholder + tail
+
+    return name
 
 
-
-def yield_file_batch(dir: Path, count: int) -> t.Generator[list[Path], None, None]:
+def batch_iterdir(dir: Path, count: int) -> t.Generator[list[Path], None, None]:
     batch = [f for f in dir.iterdir() if f.is_file()][:count]
     while batch:
         yield batch

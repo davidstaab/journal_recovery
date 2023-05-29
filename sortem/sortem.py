@@ -3,16 +3,19 @@ import typing as t
 from pathlib import Path
 from shutil import copy
 from time import sleep
+from datetime import datetime
 
 import nltk
 from common import Config as C
-from common import (compare_to_rtf, filtprint, get_short_name, largest_file,
-                    read_rtf, yield_file_batch)
+from common import (compare_to_rtf, filtprint, path_short_name, largest_file,
+                    read_rtf, batch_iterdir)
 from pathvalidate import sanitize_filename
+
+SNAME_LEN = 25  # Length of shortened names, for console output
 
 
 def compare_and_assign(source_file: Path, dry_run: bool=False) -> Path:
-    short_name = get_short_name(source_file, 40)
+    short_name = path_short_name(source_file, SNAME_LEN)
     
     try:
         source_text = read_rtf(source_file)
@@ -26,21 +29,22 @@ def compare_and_assign(source_file: Path, dry_run: bool=False) -> Path:
     calcs = compare_to_sorted(source_text, C.SORTING_DIR)
     
     if not calcs:
-        target_dir = C.SORTING_DIR / sanitize_filename(source_text[:25])
+        target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
         filtprint(f'  No similarities were calculated for {short_name}.')
     else:
         calcs.sort(reverse=True, key=lambda _: _["metric"])
     
         if calcs[0]["metric"] < C.MATCH_RATIO_THRESHOLD:
-            target_dir = C.SORTING_DIR / sanitize_filename(source_text[:25])
-            filtprint(f'  {short_name} could not be matched. Best match {calcs[0]["metric"]:.2f}')
+            target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
+            filtprint(f'  {short_name} could not be matched at {calcs[0]["metric"]:.2f}')
         else:
             target_dir = calcs[0]["dir"]
-            filtprint(f'  {short_name} best match: {calcs[0]["metric"]:.2f} at {get_short_name(target_dir, 25)}')
+            short_dname = path_short_name(target_dir, C.DNAME_LEN)
+            filtprint(f'  {short_name} best match: {calcs[0]["metric"]:.2f} in {short_dname}')
     
     if not dry_run:
         # Use first 100 characters of text as filename stem.
-        new_file_path = move_to_sorted(source_file, source_text[:100], target_dir)
+        new_file_path = move_to_sorted(source_file, source_text[:C.FNAME_LEN], target_dir)
     
     return new_file_path
 
@@ -72,43 +76,31 @@ def move_to_sorted(source_path: Path, new_stem: str, target_dir: Path) -> Path:
     new_file_path = target_dir / new_fname.strip()
     copy(source_path, new_file_path)
     source_path.unlink()
-    filtprint(f'  Saved {get_short_name(source_path, 40)} as {get_short_name(new_file_path, 40)}')
+    filtprint(f'  Saved {path_short_name(source_path, 40)} as {path_short_name(new_file_path, 40)}')
     return new_file_path
 
 
-def run_multi(n: int=-1):
+def run_multi() -> None:
     worker_count = mp.cpu_count() - 1  # Leave one behind to be polite to the OS
-    filtprint(f'Starting with {worker_count} workers')
+    filtprint(f'Using {worker_count} workers')
     with mp.Pool(processes=worker_count) as pool:
-        if n >= 0:
-            for _ in range(n):
-                for batch in yield_file_batch(C.SOURCE_DIR, count=worker_count):
-                    filtprint('Working on\n' + '\n'.join([get_short_name(b, 40) for b in batch]))
-                    pool.map(compare_and_assign, batch)             
-        else:
-            while len(list(C.SOURCE_DIR.iterdir())):
-                for batch in yield_file_batch(C.SOURCE_DIR, count=worker_count):
-                    filtprint('Working on\n' + '\n'.join([get_short_name(b, 40) for b in batch]))
-                    pool.map(compare_and_assign, batch)
+        for batch in batch_iterdir(C.SOURCE_DIR, count=worker_count):
+            filtprint('Working on\n' + '\n  '.join([path_short_name(b, SNAME_LEN) for b in batch]))
+            pool.map(compare_and_assign, batch)             
 
 
-def run_single(n: int=-1, dry_run: bool=False):
-    if n >= 0:
-        for _ in range(n):
-            for batch in yield_file_batch(C.SOURCE_DIR, count=1):
-                filtprint('Working on\n' + '\n'.join([get_short_name(b, 40) for b in batch]))
-                compare_and_assign(batch[0], dry_run)
-    else:
-        while len(list(C.SOURCE_DIR.iterdir())):
-            for batch in yield_file_batch(C.SOURCE_DIR, count=1):
-                filtprint('Working on\n' + '\n'.join([get_short_name(b, 40) for b in batch]))
-                compare_and_assign(batch[0], dry_run)
-        
+def run_single(dry_run: bool=False) -> None:
+    filtprint(f'Using 1 worker')
+    for batch in batch_iterdir(C.SOURCE_DIR, count=1):
+        filtprint(f'Working on {path_short_name(batch[0], SNAME_LEN)}')
+        compare_and_assign(batch[0], dry_run)
+
 
 if __name__ == '__main__':  # Need this for mp to work!
     
     C.set_app_dir(Path(__file__).parent.parent.resolve())
     C.set_match_ratio_threshold(90)
+    C.set_run_quiet(False)
     nltk.download('punkt', quiet=True)  # Needed by nltk
     
     opening_msgs = [
@@ -135,18 +127,16 @@ if __name__ == '__main__':  # Need this for mp to work!
 
     while True:
         try:
-            # Count files in SOURCE_DIR.
-            i = 0
-            for j, _ in enumerate(C.SOURCE_DIR.iterdir()):
-                i = j + 1
-            print(f'{i} files remaining in {C.SOURCE_DIR}')
+            file_count = sum(1 for _ in C.SOURCE_DIR.iterdir() if _.is_file())
         except FileNotFoundError:
-            pass
+            file_count = 0
         
-        if 0 == i:
-            sleep(10)
+        now = datetime.now().strftime("%A, %H:%M")
+        print(now + f': {file_count} files in {C.SOURCE_DIR}')
+        
+        if not file_count:
+            sleep(60)
             continue
 
-        # compare_and_assign('./.files/File Name Lost (5469).rtf')  # Do one specific file
-        run_single(n=-1, dry_run=False)
-        # run_multi(n=min(i, 20))
+        # run_single(dry_run=False)
+        run_multi()
