@@ -2,9 +2,11 @@
 A python script to recover my personal journal from 80k .rtf file fragments scraped off a backup drive
 
 ## How to run it
-`git clone --recurse-submodules` the repo, then: `docker-compose build --no-cache --progress=plain`
+`git clone --recurse-submodules` the repo
 
-and then: `docker-compose up`
+then: `cd app && docker compose build --no-cache --progress=plain`
+
+and then: `docker compose up`
 
 ### Environment config
 
