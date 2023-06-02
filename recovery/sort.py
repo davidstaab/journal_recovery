@@ -13,6 +13,9 @@ from common import (batch_iterdir, compare_to_rtf, cprintif, largest_file,
                     path_short_name, read_rtf)
 from pathvalidate import sanitize_filename
 
+SORT_MSG_COLOR = 'light_blue'
+WARN_MSG_COLOR = 'light_yellow'
+DANGER_MSG_COLOR = 'light_red'
 
 def _sname(path: Path) -> str:
     """Return shortened name of path. Hard-coded to 30 characters."""
@@ -30,12 +33,12 @@ def _safe_make_dir(d: Path):
             copy(str(d), str(d) + '.bak')
             d.unlink()
             d.mkdir()
-            cprintif(f'Found something named {d.name} in {d.parent} and renamed it to {d.name}.bak', 'light_red')
+            cprintif(f'Found something named {d.name} in {d.parent} and renamed it to {d.name}.bak', DANGER_MSG_COLOR)
 
 
 def _print_file_count_msg() -> None:
     file_count = sum(1 for _ in C.SOURCE_DIR.iterdir() if _.is_file())
-    cprintif(datetime.now().strftime("%A, %H:%M") + f': {file_count} files remaining', 'light_yellow')
+    cprintif(datetime.now().strftime("%A, %H:%M") + f': {file_count} files remaining', WARN_MSG_COLOR)
 
 
 def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: bool=False) -> Path:
@@ -49,7 +52,7 @@ def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: boo
     try:
         source_text = read_rtf(source_file)
     except Exception as e:
-        cprintif(f'  {file_sname} -> {_sname(C.UNREADABLE_DIR)} because {e}', 'light_red')
+        cprintif(f'  {file_sname} -> {_sname(C.UNREADABLE_DIR)} because {e}', DANGER_MSG_COLOR)
         new_file_path = C.UNREADABLE_DIR / source_file.name
         copy(source_file, new_file_path)
         source_file.unlink()
@@ -59,13 +62,13 @@ def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: boo
     
     if not calcs:
         target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
-        cprintif(f'  {file_sname}: No similarities were calculated!', 'light_red')
+        cprintif(f'  {file_sname}: No similarities were calculated!', DANGER_MSG_COLOR)
     else:
         calcs.sort(reverse=True, key=lambda _: _["metric"])
     
         if calcs[0]["metric"] < C.MATCH_RATIO_THRESHOLD:
             target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
-            cprintif(f'  {file_sname} match {calcs[0]["metric"]:.2f}% < {C.MATCH_RATIO_THRESHOLD}%', 'light_yellow')
+            cprintif(f'  {file_sname} match {calcs[0]["metric"]:.2f}% < {C.MATCH_RATIO_THRESHOLD}%', WARN_MSG_COLOR)
         else:
             target_dir = calcs[0]["dir"]
             cprintif(f'  {file_sname} match: {calcs[0]["metric"]:.2f}% in {_sname(target_dir)}')
@@ -126,7 +129,7 @@ def run_multi(workers:int = 0) -> None:
     max_workers = mp.cpu_count() - 1  # Leave one behind to be polite to the OS
     if not 1 <= workers <= max_workers:
         workers = max_workers
-    cprintif(f'Using {workers} workers', 'light_blue')
+    cprintif(f'Using {workers} workers', SORT_MSG_COLOR)
     
     with tempfile.NamedTemporaryFile('wb') as f:
         # Serialize config object to file so that subprocesses can access it.
@@ -139,7 +142,7 @@ def run_multi(workers:int = 0) -> None:
                     _print_file_count_msg()
                     then = now
                 
-                cprintif('Working on\n  ' + '\n  '.join([_sname(b) for b in batch]), 'light_blue')
+                cprintif('Working on\n  ' + '\n  '.join([_sname(b) for b in batch]), SORT_MSG_COLOR)
                 pool.map(partial(compare_and_assign, mp_cfg_file=config_file), batch)
 
 
@@ -151,7 +154,7 @@ def run_single(dry_run: bool=False) -> None:
     then = datetime.now()
     _print_file_count_msg()
     
-    cprintif(f'Using 1 worker', 'light_yellow')
+    cprintif(f'Using 1 worker', SORT_MSG_COLOR)
     
     for file in C.SOURCE_DIR.iterdir():
         now = datetime.now()
@@ -159,7 +162,7 @@ def run_single(dry_run: bool=False) -> None:
             _print_file_count_msg()
             then = now
         
-        cprintif(f'Working on {_sname(file)}', 'light_blue')
+        cprintif(f'Working on {_sname(file)}', SORT_MSG_COLOR)
         compare_and_assign(file, dry_run=dry_run)
 
 
