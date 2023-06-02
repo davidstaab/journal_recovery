@@ -6,4 +6,4 @@ services:
       - ../sorted:/home/sorted
     environment:
       - PYTHONUNBUFFERED=1
-    command: python3 ./sortem/sortem.py
+    command: python3 ./recovery/sift.py
