@@ -14,14 +14,14 @@ from common import (batch_iterdir, compare_to_rtf, cprintif, largest_file,
 from pathvalidate import sanitize_filename
 
 
-def sname(path: Path) -> str:
+def _sname(path: Path) -> str:
     """Return shortened name of path. Hard-coded to 30 characters."""
     return path_short_name(path, 30)
 
 
-def safe_make_dir(d: Path):
+def _safe_make_dir(d: Path):
     try:
-        d.mkdir()
+        d.mkdir(exist_ok=False)
     except FileExistsError:
         if not d.is_dir():
             # NB: copy/delete works across file systems per https://stackoverflow.com/a/42400063/2539684
@@ -30,6 +30,12 @@ def safe_make_dir(d: Path):
             copy(str(d), str(d) + '.bak')
             d.unlink()
             d.mkdir()
+            cprintif(f'Found something named {d.name} in {d.parent} and renamed it to {d.name}.bak', 'light_red')
+
+
+def _print_file_count_msg() -> None:
+    file_count = sum(1 for _ in C.SOURCE_DIR.iterdir() if _.is_file())
+    cprintif(datetime.now().strftime("%A, %H:%M") + f': {file_count} files remaining', 'light_yellow')
 
 
 def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: bool=False) -> Path:
@@ -38,12 +44,12 @@ def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: boo
     if mp_cfg_file and mp_cfg_file.exists():
         C.load(mp_cfg_file)
     
-    file_sname = sname(source_file)
+    file_sname = _sname(source_file)
     
     try:
         source_text = read_rtf(source_file)
     except Exception as e:
-        cprintif(f'  {file_sname} -> {sname(C.UNREADABLE_DIR)} because {e}', 'light_red')
+        cprintif(f'  {file_sname} -> {_sname(C.UNREADABLE_DIR)} because {e}', 'light_red')
         new_file_path = C.UNREADABLE_DIR / source_file.name
         copy(source_file, new_file_path)
         source_file.unlink()
@@ -59,10 +65,10 @@ def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: boo
     
         if calcs[0]["metric"] < C.MATCH_RATIO_THRESHOLD:
             target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
-            cprintif(f'  {file_sname} match {calcs[0]["metric"]:.2f}%', 'light_yellow')
+            cprintif(f'  {file_sname} match {calcs[0]["metric"]:.2f}% < {C.MATCH_RATIO_THRESHOLD}%', 'light_yellow')
         else:
             target_dir = calcs[0]["dir"]
-            cprintif(f'  {file_sname} match: {calcs[0]["metric"]:.2f}% in {sname(target_dir)}')
+            cprintif(f'  {file_sname} match: {calcs[0]["metric"]:.2f}% in {_sname(target_dir)}')
     
     if not dry_run:
         # Use first 100 characters of text as filename stem.
@@ -101,28 +107,26 @@ def move_to_sorted(source_path: Path, new_stem: str, target_dir: Path) -> Path:
     new_file_path = target_dir / new_fname.strip()
     copy(source_path, new_file_path)
     source_path.unlink()
-    cprintif(f'  {sname(source_path)} -> {sname(target_dir)}{sname(new_file_path)}')
+    cprintif(f'  {_sname(source_path)} -> {_sname(target_dir)}{_sname(new_file_path)}')
     return new_file_path
-
-
-def print_file_count_msg() -> None:
-    file_count = sum(1 for _ in C.SOURCE_DIR.iterdir() if _.is_file())
-    cprintif(datetime.now().strftime("%A, %H:%M") + f': {file_count} files remaining', 'light_yellow')
 
 
 def run_multi(workers:int = 0) -> None:
     
-    if __name__ != '__main__':
-        # Multiprocessing only works (in 'spawn' mode on MacOS) when running from the command line.
-        raise Exception('This function should only be called when running from the command line.')
+    # if __name__ != '__main__':
+    #     # Multiprocessing only works (in 'spawn' mode on MacOS) when running from the command line.
+    #     raise Exception('This function should only be called when running from the command line.')
+    
+    for d in [C.SORTING_DIR, C.UNREADABLE_DIR]:
+        _safe_make_dir(d)
     
     then = datetime.now()
-    print_file_count_msg()
+    _print_file_count_msg()
     
     max_workers = mp.cpu_count() - 1  # Leave one behind to be polite to the OS
     if not 1 <= workers <= max_workers:
         workers = max_workers
-    cprintif(f'Using {workers} workers', 'light_yellow')
+    cprintif(f'Using {workers} workers', 'light_blue')
     
     with tempfile.NamedTemporaryFile('wb') as f:
         # Serialize config object to file so that subprocesses can access it.
@@ -132,26 +136,30 @@ def run_multi(workers:int = 0) -> None:
             for batch in batch_iterdir(C.SOURCE_DIR, count=workers):
                 now = datetime.now()
                 if now - then > timedelta(minutes=5):
-                    print_file_count_msg()
+                    _print_file_count_msg()
                     then = now
                 
-                cprintif('Working on\n  ' + '\n  '.join([sname(b) for b in batch]), 'light_blue')
+                cprintif('Working on\n  ' + '\n  '.join([_sname(b) for b in batch]), 'light_blue')
                 pool.map(partial(compare_and_assign, mp_cfg_file=config_file), batch)
 
 
 def run_single(dry_run: bool=False) -> None:
+    
+    for d in [C.SORTING_DIR, C.UNREADABLE_DIR]:
+        _safe_make_dir(d)
+    
     then = datetime.now()
-    print_file_count_msg()
+    _print_file_count_msg()
     
     cprintif(f'Using 1 worker', 'light_yellow')
     
     for file in C.SOURCE_DIR.iterdir():
         now = datetime.now()
         if now - then > timedelta(minutes=5):
-            print_file_count_msg()
+            _print_file_count_msg()
             then = now
         
-        cprintif(f'Working on {sname(file)}', 'light_blue')
+        cprintif(f'Working on {_sname(file)}', 'light_blue')
         compare_and_assign(file, dry_run=dry_run)
 
 
@@ -170,10 +178,7 @@ if __name__ == '__main__':
         f'Match threshold: {C.MATCH_RATIO_THRESHOLD}%',
         f'----------------------',
     ]
-
     cprintif('\n'.join(opening_msgs))
-    for d in [C.SORTING_DIR, C.UNREADABLE_DIR]:
-        safe_make_dir(d)
 
     while True:
         try:
@@ -182,7 +187,7 @@ if __name__ == '__main__':
             file_count = 0
                 
         if not file_count:
-            print_file_count_msg()
+            _print_file_count_msg()
             sleep(60)
             continue
 

@@ -20,33 +20,40 @@ def sanity_check() -> list[Path]:
     """Return paths that don't have only one file in them."""
     ret = []
     for subdir in C.SORTING_DIR.iterdir():
-        if subdir.is_dir() and not subdir == C.UNREADABLE_DIR and not check_dir_for_one_file(subdir):
+        if subdir.is_dir() and subdir != C.UNREADABLE_DIR and not check_dir_for_one_file(subdir):
             ret.append(subdir)
     return ret
 
-def prune_similar_files(dir: Path, ignores: list) -> int:
-    
-    if dir.is_dir() and dir not in ignores:
-        cprintif(f'Working in {sname(dir)}', 'light_blue')
-        # Compare to the largest file on disk because sortem does.
-        largest = largest_file(dir)
+def prune_similar_files() -> int:
+    pruned = 0
+    for dir in C.SORTING_DIR.iterdir():
+        if dir.is_dir() and dir != C.UNREADABLE_DIR:
+            cprintif(f'Working in {sname(dir)}', 'light_blue')
+            # Compare to the largest file on disk because sortem does.
+            largest = largest_file(dir)
 
-        pruned = 0
-        for file in dir.iterdir():
-            
-            if file.is_file() and file != largest:
-                source_tokens = set(nltk.word_tokenize(read_rtf(file)))
-                match = compare_to_rtf(source_tokens, largest)
-                
-                if  match >= C.MATCH_RATIO_THRESHOLD:
-                    cprintif(f'  {sname(file)} match {match:.2f}% -> Deleted.', 'light_yellow')
-                    file.unlink()
-                    pruned += 1
-                else:
-                    cprintif(f'  {sname(file)} match {match:.2f}% -> Returned to /{C.SOURCE_DIR.stem}')
-                    copy(file, C.SOURCE_DIR / file.name)
-                    file.unlink()
+            for file in dir.iterdir():
+                if file.is_file() and file != largest:
+                    source_tokens = set(nltk.word_tokenize(read_rtf(file)))
+                    match = compare_to_rtf(source_tokens, largest)
+                    
+                    if  match >= C.MATCH_RATIO_THRESHOLD:
+                        cprintif(f'  {sname(file)} match {match:.2f}% -> Deleted.', 'light_yellow')
+                        file.unlink()
+                        pruned += 1
+                    else:
+                        cprintif(f'  {sname(file)} match {match:.2f}% -> Returned to /{C.SOURCE_DIR.stem}')
+                        copy(file, C.SOURCE_DIR / file.name)
+                        file.unlink()
     return pruned
+
+
+def remove_empty_sorting_dirs() -> None:
+    for subdir in C.SORTING_DIR.iterdir():
+        if subdir.is_dir() and subdir != C.UNREADABLE_DIR:
+            if not len([i for i in subdir.iterdir()]):  # If empty
+                cprintif(f'  Deleting /{sname(subdir)}', 'light_yellow')
+                subdir.rmdir()
 
 
 if __name__ == '__main__':
@@ -64,20 +71,14 @@ if __name__ == '__main__':
     ]
     cprintif('\n'.join(opening_msgs))
     
-    ignores = [C.UNREADABLE_DIR]
     cprintif('Pruning similar files')
-    pruned = 0
-    for subdir in C.SORTING_DIR.iterdir():
-        pruned += prune_similar_files(subdir, ignores)
+    pruned = prune_similar_files()
     cprintif(f'{pruned} files removed.', 'light_yellow')
 
     cprintif('----------------------')
-    cprintif('Deleting empty subdirs')                        
-    for subdir in C.SORTING_DIR.iterdir():
-        if subdir.is_dir() and subdir not in ignores:
-            if not len([i for i in subdir.iterdir()]):  # If empty
-                cprintif(f'  Deleting /{sname(subdir)}', 'light_yellow')
-                subdir.rmdir()
+    cprintif('Removing empty sorting dirs')
+    remove_empty_sorting_dirs()                      
+
                 
     failed_dirs = sanity_check()
     if len(failed_dirs):
