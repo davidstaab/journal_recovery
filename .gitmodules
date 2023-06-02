@@ -1,3 +1,3 @@
-[submodule "striprtf/striprtf"]
-	path = sortem/striprtf/striprtf
+[submodule "recovery/striprtf/striprtf"]
+	path = recovery/striprtf/striprtf
 	url = https://github.com/joshy/striprtf.git
