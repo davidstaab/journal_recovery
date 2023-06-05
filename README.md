@@ -67,9 +67,9 @@ docker build --no-cache --platform linux/amd64 -t gcr.io/reliable-return-384618/
 ```
 
 #### 2. Bounce the VM (local shell)
-`gcloud compute instances stop sort.py-worker`
+`gcloud compute instances stop sortem-worker`
 
-`gcloud compute instances start sort.py-worker`
+`gcloud compute instances start sortem-worker`
 
 ### Utilities
 #### SSH via terminal. Better just to use Google's shell window in Gcloud web.
