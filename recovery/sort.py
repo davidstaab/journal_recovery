@@ -103,7 +103,22 @@ def compare_to_sorted(text: str, sorted_dir: Path) -> list[dict[float, Path]]:
 
 
 def move_to_sorted(source_path: Path, new_stem: str, target_dir: Path) -> Path:
-    target_dir.mkdir(exist_ok=True)
+    try:
+        target_dir.mkdir(exist_ok=True)
+    except OSError as e:
+        """
+        Addressing a bug seen with this dir name:
+        `/home/sorted/VMWARE 最终用户许可协议请注意，在本软件的安装过程中无论可能会出现任何条款
+            ，使用本软件都将受此最终用户许可协议各条款的约束。重要信息，请仔细阅读：您一旦下载
+            、安装或使用本软件，您（自然人`
+        Maybe because those characters aren't UTF-8? Anyway if I were writing unit
+        tests there'd be one for this.
+        """
+        if e.errno == 36:  # File name too long
+            target_dir = target_dir.parent / target_dir.name[:len(target_dir.name) // 2]
+            target_dir.mkdir(exist_ok=True)
+        else:
+            raise e
     
     # When saving, sanitize stem, add a unique index + ".rtf".
     new_fname: str = ''.join([sanitize_filename(new_stem), f' {len(list(target_dir.iterdir()))}', '.rtf'])
