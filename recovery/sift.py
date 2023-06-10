@@ -83,13 +83,14 @@ if __name__ == '__main__':
     # Because prune is destructive, it should always run at a very high threshold.
 	#   This will ensure it only destroys with maximum confidence.
     # Sort can be iteratively ratcheted up to meet the same threshold.
+    start_thresh = 70
     max_thresh = 95
-    for sort_thresh in range(70, max_thresh + 1, 5):
+    for sort_thresh in range(start_thresh, max_thresh + 1, 5):
         cprintif('----------------------', SIFT_MSG_COLOR)
         cprintif('----------------------', SIFT_MSG_COLOR)
         cprintif(f'Sorting with threshold: {sort_thresh}%', SIFT_MSG_COLOR)
         
-        # Sort/Prune until they keep shuffling the same files back and forth
+        # Sort/Prune at this threshold until they keep shuffling the same files back and forth
         prev_count = count_files(C.SOURCE_DIR)
         while True:
             C.set_match_ratio_threshold(sort_thresh)
@@ -106,7 +107,7 @@ if __name__ == '__main__':
         if unsorted_count:
             cprintif(f'{unsorted_count} files could not be sorted', DANGER_MSG_COLOR)
             
-            if sort_thresh == max_thresh:  # Final iteration
+            if sort_thresh == max_thresh:  # Final sort/prune loop completed
                 (unsorted_dir := C.SOURCE_DIR / "unsorted").mkdir(exist_ok=True)
                 cprintif(f'Moving them to {unsorted_dir}', DANGER_MSG_COLOR)
                 for f in C.SOURCE_DIR.iterdir():
