@@ -4,6 +4,8 @@ A Linux/MacOS Python app I made to recover my personal journal from 80,000 *.rtf
 ## Quickstart
 First, `git clone --recurse-submodules` the repo
 
+Then `pip3 install -r requirements.txt`
+
 If you have Docker installed: `cd app && docker compose build --no-cache --progress=plain` and then `docker compose up`
 
 Or if you don't have Docker, you can run it directly with Python 3.10+ as `python3 -m sift`
