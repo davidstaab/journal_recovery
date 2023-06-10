@@ -1,3 +1,4 @@
+![](docs/output.gif)
 # journal_recovery
 A Linux/MacOS Python app I made to recover my personal journal from 80,000 *.rtf file fragments scraped off a backup drive
 
