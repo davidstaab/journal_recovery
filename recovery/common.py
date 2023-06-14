@@ -127,18 +127,19 @@ def pseudo_jaccard_similarity(label1: set, label2: set) -> float:
     return 0
 
 
-def read_rtf(file: Path, length: int = -1, ignore_unreadable: bool = False) -> str:
+def read_rtf(file: Path, length: int = -1) -> str:
     with open(file) as f:
         try:
             # NB: 'errors' arg is the same as bytes.decode()
             # See here for possible values: https://docs.python.org/3.10/library/codecs.html#error-handlers
             text = rtf_to_text(f.read(length), errors="ignore")
         except UnicodeDecodeError as e:
-            
-            if not ignore_unreadable:
-                raise
-            
-            return ''
+            if e.reason.startswith('invalid') and e.reason.endswith('byte'):
+                # Fallback: try just reading the text we can read
+                text = rtf_to_text(f.read(e.start - 1), errors="ignore")
+                return text
+
+            raise
     
     return text
 
@@ -146,7 +147,7 @@ def read_rtf(file: Path, length: int = -1, ignore_unreadable: bool = False) -> s
 def compare_to_rtf(tokens: set, file: Path) -> float:
     # Read 500 characters for a sanity check. If it passes, read the whole thing.
     try:
-        comp_text = read_rtf(file, length=500, ignore_unreadable=True)
+        comp_text = read_rtf(file, length=500)
         
         if comp_text:
             comp_tokens = set(nltk.word_tokenize(comp_text))
