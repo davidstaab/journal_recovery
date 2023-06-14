@@ -41,7 +41,7 @@ def _print_file_count_msg() -> None:
     cprintif(datetime.now().strftime("%A, %H:%M") + f': {file_count} files remaining', WARN_MSG_COLOR)
 
 
-def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: bool=False) -> Path:
+def sort_file(source_file: Path, mp_cfg_file: Path = None, dry_run: bool=False) -> Path:
     """Note: Specify config_file when running in multiprocessing mode."""
     
     if mp_cfg_file and mp_cfg_file.exists():
@@ -61,13 +61,13 @@ def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: boo
     calcs = compare_to_sorted(source_text, C.SORTING_DIR)
     
     if not calcs:
-        target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
+        target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN]).lstrip()
         cprintif(f'  {file_sname}: No similarities were calculated!', DANGER_MSG_COLOR)
     else:
         calcs.sort(reverse=True, key=lambda _: _["metric"])
     
         if calcs[0]["metric"] < C.MATCH_RATIO_THRESHOLD:
-            target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN])
+            target_dir = C.SORTING_DIR / sanitize_filename(source_text[:C.DNAME_LEN]).lstrip()
             cprintif(f'  {file_sname} match {calcs[0]["metric"]:.2f}% < {C.MATCH_RATIO_THRESHOLD}%', WARN_MSG_COLOR)
         else:
             target_dir = calcs[0]["dir"]
@@ -75,7 +75,7 @@ def compare_and_assign(source_file: Path, mp_cfg_file: Path = None, dry_run: boo
     
     if not dry_run:
         # Use first 100 characters of text as filename stem.
-        new_file_path = move_to_sorted(source_file, source_text[:C.FNAME_LEN], target_dir)
+        new_file_path = move_to_sorted(source_file, source_text.lstrip()[:C.FNAME_LEN], target_dir)
     
     return new_file_path
 
@@ -158,7 +158,7 @@ def run_multi(workers:int = 0) -> None:
                     then = now
                 
                 cprintif('Working on\n  ' + '\n  '.join([_sname(b) for b in batch]), SORT_MSG_COLOR)
-                pool.map(partial(compare_and_assign, mp_cfg_file=config_file), batch)
+                pool.map(partial(sort_file, mp_cfg_file=config_file), batch)
 
 
 def run_single(dry_run: bool=False) -> None:
@@ -178,12 +178,12 @@ def run_single(dry_run: bool=False) -> None:
             then = now
         
         cprintif(f'Working on {_sname(file)}', SORT_MSG_COLOR)
-        compare_and_assign(file, dry_run=dry_run)
+        sort_file(file, dry_run=dry_run)
 
 
 if __name__ == '__main__':
     C.set_app_dir(Path(__file__).parent.parent.resolve())
-    C.set_match_ratio_threshold(90)    
+    C.set_match_ratio_threshold(80)    
     C.set_run_quiet(False)
     
     nltk.download('punkt', quiet=True)  # Needed by nltk
